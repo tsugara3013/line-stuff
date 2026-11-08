@@ -1,0 +1,33 @@
+body {
+  background: #191412;
+  font-family: Arial, sans-serif;
+  margin: 0;
+  padding: 20px;
+}
+
+.shelf {
+  display: flex;
+  flex-direction: column;
+  gap: 2rem;
+}
+
+.row {
+  display: flex;
+  justify-content: center;
+  gap: 1rem;
+  padding: 1rem;
+  background: #1a2b52;
+  border-radius: 8px;
+}
+
+.card {
+  background: #8a8a8a;
+  color: #191412;
+  flex: 0 0 200px;
+  height: 150px;
+  border-radius: 6px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
