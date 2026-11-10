@@ -31,29 +31,49 @@ async function sendLine(message, target, quoteToken = null) {
 }
 
 // Filter -CH materials and remember matching customers
-function filterCH(text) {
-    const customers = [];
 
-    const filtered = text.split(/\r?\n\s*\r?\n/)
-        .map(section => {
-            const [header, ...rows] = section.trim().split(/\r?\n/);
 
-            const matched = rows.filter(row =>
-                /^\s*\S+-ch\b/i.test(row)
-            );
-
-            if (!matched.length) return null;
-
-            const name = header.split(/ส่ง/)[0].trim();
-            customers.push(name);
-
-            return [header, ...matched].join('\n');
-        })
-        .filter(Boolean)
-        .join('\n\n');
-
-    return { filtered, customers };
+async function processMaterials(material) {
+    return 'ไว้ใส่วันที่ หลังอัพเดท'; // Playwright processing later
 }
+
+async function filterCH(text) {
+    const customers = [];
+    const filteredSections = [];
+
+    for (const section of text.split(/\r?\n\s*\r?\n/)) {
+        const [header, ...rows] = section.trim().split(/\r?\n/);
+
+        const matched = rows.filter(row =>
+            /^\s*\S+-ch\b/i.test(row)
+        );
+
+        if (!matched.length) continue;
+
+        const name = header.split(/ส่ง/)[0].trim();
+        customers.push(name);
+
+        const processedRows = [];
+
+        for (const row of matched) {
+            const material = row.trim().split(/\s+/);
+            const replacement = await processMaterials(material);
+
+            processedRows.push(`${row}\n${replacement}`);
+        }
+
+        filteredSections.push(
+            [header, ...processedRows].join('\n')
+        );
+    }
+
+    return {
+        filtered: filteredSections.join('\n\n'),
+        customers
+    };
+}
+
+
 
 const messagePairs = new Map();
 const quoteTokens = new Map();
@@ -103,7 +123,7 @@ app.post('/webhook', async (req, res) => {
         }
 
         try {
-            const { filtered, customers } = filterCH(message.text);
+            const { filtered, customers } = await filterCH(message.text);
 
             // Forward matching -CH rows with customer headers
             if (filtered) {
