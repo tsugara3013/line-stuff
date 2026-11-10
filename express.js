@@ -1,3 +1,4 @@
+
 require('dotenv').config({ path: 'url.env' });
 
 const express = require('express');
@@ -22,7 +23,6 @@ async function sendLine(message, target, quoteToken = null) {
         })
     });
 
-
     if (!response.ok) {
         throw new Error(await response.text());
     }
@@ -30,8 +30,57 @@ async function sendLine(message, target, quoteToken = null) {
     return await response.json();
 }
 
+// Filter -CH materials and remember matching customers
+function filterCH(text) {
+    const customers = [];
+
+    const filtered = text.split(/\r?\n\s*\r?\n/)
+        .map(section => {
+            const [header, ...rows] = section.trim().split(/\r?\n/);
+
+            const matched = rows.filter(row =>
+                /^\s*\S+-ch\b/i.test(row)
+            );
+
+            if (!matched.length) return null;
+
+            const name = header.split(/ส่ง/)[0].trim();
+            customers.push(name);
+
+            return [header, ...matched].join('\n');
+        })
+        .filter(Boolean)
+        .join('\n\n');
+
+    return { filtered, customers };
+}
+
 const messagePairs = new Map();
 const quoteTokens = new Map();
+const customerNames = new Map();
+
+// Clear message history at midnight (Thailand time)
+function scheduleMidnightClear() {
+    const now = new Date();
+    const thailandTime = new Date(now.getTime() + 7 * 60 * 60 * 1000);
+
+    const nextMidnight = new Date(thailandTime);
+    nextMidnight.setUTCHours(24, 0, 0, 0);
+
+    const delay = nextMidnight - thailandTime;
+
+    setTimeout(() => {
+        messagePairs.clear();
+        quoteTokens.clear();
+        customerNames.clear();
+
+        console.log('Message history cleared');
+
+        scheduleMidnightClear();
+    }, delay);
+}
+
+scheduleMidnightClear();
 
 app.post('/webhook', async (req, res) => {
     const events = req.body.events || [];
@@ -54,15 +103,18 @@ app.post('/webhook', async (req, res) => {
         }
 
         try {
-            // Normal message containing -ch
-            if (message.text.toLowerCase().includes('-ch')) {
-                const result = await sendLine(message.text, targetGroupId);
+            const { filtered, customers } = filterCH(message.text);
 
+            // Forward matching -CH rows with customer headers
+            if (filtered) {
+                const result = await sendLine(filtered, targetGroupId);
                 const sent = result.sentMessages?.[0];
 
                 if (sent?.id) {
                     messagePairs.set(message.id, sent.id);
                     messagePairs.set(sent.id, message.id);
+
+                    customerNames.set(message.id, customers);
 
                     if (message.quoteToken) {
                         quoteTokens.set(message.id, message.quoteToken);
@@ -74,23 +126,29 @@ app.post('/webhook', async (req, res) => {
                 }
             }
 
-            // Reply to a previously forwarded message
+            // Forward replies only if customer name matches
             else if (
                 message.quotedMessageId &&
                 messagePairs.has(message.quotedMessageId)
             ) {
-                const targetMessageId =
-                    messagePairs.get(message.quotedMessageId);
+                const originalId = message.quotedMessageId;
+                const customers = customerNames.get(originalId) || [];
 
-                const targetQuoteToken =
-                    quoteTokens.get(targetMessageId);
+                const matches = customers.some(name =>
+                    message.text.includes(name)
+                );
 
-                if (targetQuoteToken) {
-                    await sendLine(
-                        message.text,
-                        targetGroupId,
-                        targetQuoteToken
-                    );
+                if (matches) {
+                    const targetMessageId = messagePairs.get(originalId);
+                    const targetQuoteToken = quoteTokens.get(targetMessageId);
+
+                    if (targetQuoteToken) {
+                        await sendLine(
+                            message.text,
+                            targetGroupId,
+                            targetQuoteToken
+                        );
+                    }
                 }
             }
         } catch (err) {
@@ -102,8 +160,8 @@ app.post('/webhook', async (req, res) => {
 });
 
 app.get('/main', async (req, res) => {
-    res.send("hello, world")
-})
+    res.send('hello, world');
+});
 
 app.listen(process.env.PORT || 3000, () => {
     console.log('Server running');
