@@ -5,7 +5,7 @@ const app = express();
 
 app.use(express.json());
 
-async function sendLine(message, target) {
+async function sendLine(message, target, quoteToken = null) {
     const response = await fetch('https://api.line.me/v2/bot/message/push', {
         method: 'POST',
         headers: {
@@ -14,51 +14,89 @@ async function sendLine(message, target) {
         },
         body: JSON.stringify({
             to: target,
-            messages: [{ type: 'text', text: message }]
+            messages: [{
+                type: 'text',
+                text: message,
+                ...(quoteToken ? { quoteToken } : {})
+            }]
         })
     });
+
 
     if (!response.ok) {
         throw new Error(await response.text());
     }
+
+    return await response.json();
 }
 
-app.post('/webhook', (req, res) => {
-    // console.log('LINE WEBHOOK:', req.body);
+const messagePairs = new Map();
+const quoteTokens = new Map();
 
+app.post('/webhook', async (req, res) => {
     const events = req.body.events || [];
 
-    events.forEach(event => {
-        console.log('Received:', event.message?.text);
-        console.log('ID:', event.source?.groupId || event.source?.userId);
-        console.log('Expected ID:', process.env.DUMP_GROUP_ID);
-    });
+    for (const event of events) {
+        if (event.type !== 'message') continue;
 
-    events.forEach(event => {
-        if (
-            event.source?.groupId === process.env.DUMP_GROUP_ID &&
-            event.type === 'message' &&
-            event.message?.type === 'text' &&
-            event.message.text.toLowerCase().includes('-ch')
-            
-            
-        ) {
-            console.log('Command -ch detected in target group!');
-            sendLine(event.message.text, process.env.TEST_TWO)
-                .catch(err => console.error('LINE error:', err));
+        const message = event.message;
+        if (message.type !== 'text') continue;
+
+        const groupId = event.source?.groupId;
+        let targetGroupId;
+
+        if (groupId === process.env.DUMP_GROUP_ID) {
+            targetGroupId = process.env.TEST_TWO;
+        } else if (groupId === process.env.BIG_GROUP_ID) {
+            targetGroupId = process.env.ACTUAL_TARGET_GROUP_ID;
+        } else {
+            continue;
         }
 
-        else if (
-            event.source?.groupId === process.env.BIG_GROUP_ID &&
-            event.type === 'message' &&
-            event.message?.type === 'text' &&
-            event.message.text.toLowerCase().includes('-ch')
-        ) {
-            console.log('Command -ch detected in test group!');
-            sendLine(event.message.text, process.env.ACTUAL_TARGET_GROUP_ID)
-                .catch(err => console.error('LINE error:', err));
+        try {
+            // Normal message containing -ch
+            if (message.text.toLowerCase().includes('-ch')) {
+                const result = await sendLine(message.text, targetGroupId);
+
+                const sent = result.sentMessages?.[0];
+
+                if (sent?.id) {
+                    messagePairs.set(message.id, sent.id);
+                    messagePairs.set(sent.id, message.id);
+
+                    if (message.quoteToken) {
+                        quoteTokens.set(message.id, message.quoteToken);
+                    }
+
+                    if (sent.quoteToken) {
+                        quoteTokens.set(sent.id, sent.quoteToken);
+                    }
+                }
+            }
+
+            // Reply to a previously forwarded message
+            else if (
+                message.quotedMessageId &&
+                messagePairs.has(message.quotedMessageId)
+            ) {
+                const targetMessageId =
+                    messagePairs.get(message.quotedMessageId);
+
+                const targetQuoteToken =
+                    quoteTokens.get(targetMessageId);
+
+                if (targetQuoteToken) {
+                    await sendLine(
+                        message.text,
+                        targetGroupId,
+                        targetQuoteToken
+                    );
+                }
+            }
+        } catch (err) {
+            console.error('LINE error:', err);
         }
-    });
+    }
 
     res.sendStatus(200);
 });
@@ -67,6 +105,6 @@ app.get('/main', async (req, res) => {
     res.send("hello, world")
 })
 
-app.listen(3000, () => {
-    console.log('hey, yo')
-})
+app.listen(process.env.PORT || 3000, () => {
+    console.log('Server running');
+});
