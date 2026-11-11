@@ -54,14 +54,20 @@ async function filterCH(text) {
         for (const row of matched) {
             const material = row.trim().split(/\s+/);
 
+            if (material.length > 10) {
+                processedRows.push(row);
+                continue;
+            }
+
+            if (material.length === 9) {
+                material.splice(2, 2, `${material[2]} ${material[3]}`);
+            }
+
             if (material.length === 8) {
                 material.splice(2, 2, `${material[2]} ${material[3]}`);
             }
 
-            if (material.length > 8) {
-                processedRows.push(row);
-                continue;
-            }
+            
 
             const replacement = await processMaterials(material);
             processedRows.push(`${row}\n${replacement}`);
@@ -109,6 +115,8 @@ scheduleMidnightClear();
 
 app.post('/webhook', async (req, res) => {
     const events = req.body.events || [];
+
+    res.sendStatus(200);
 
     for (const event of events) {
         if (event.type !== 'message') continue;
@@ -181,7 +189,6 @@ app.post('/webhook', async (req, res) => {
         }
     }
 
-    res.sendStatus(200);
 });
 
 app.get('/main', async (req, res) => {
