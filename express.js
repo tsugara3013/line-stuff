@@ -59,12 +59,15 @@ async function filterCH(text) {
                 continue;
             }
 
-            if (material.length === 9) {
+            if (
+                (material.length === 9 || material.length === 8) &&
+                isNaN(Number(material[2])) &&
+                isNaN(Number(material[3]))
+            ) {
                 material.splice(2, 2, `${material[2]} ${material[3]}`);
-            }
-
-            if (material.length === 8) {
-                material.splice(2, 2, `${material[2]} ${material[3]}`);
+            } else {
+                processedRows.push(row);
+                continue;
             }
 
             
