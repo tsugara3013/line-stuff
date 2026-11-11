@@ -110,6 +110,8 @@ scheduleMidnightClear();
 app.post('/webhook', async (req, res) => {
     const events = req.body.events || [];
 
+        res.sendStatus(200);
+
     for (const event of events) {
         if (event.type !== 'message') continue;
 
@@ -181,7 +183,6 @@ app.post('/webhook', async (req, res) => {
         }
     }
 
-    res.sendStatus(200);
 });
 
 app.get('/main', async (req, res) => {
