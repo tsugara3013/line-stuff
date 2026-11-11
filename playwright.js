@@ -6,7 +6,7 @@ const { chromium } = require('playwright');
 async function processMaterials(material) {
 
     const browser = await chromium.launch({
-        headless: false
+        headless: true
     });
 
     let finalText = '';
@@ -119,12 +119,12 @@ async function processMaterials(material) {
     return finalText;
 }
 
-if (require.main === module) {
-    const testMaterial = ['pet-ch', 'aj', 'โคโลน่า ด้านใน', '680', '12', '12000', '10'];
+// if (require.main === module) {
+//     const testMaterial = ['pet-ch', 'aj', 'โคโลน่า ด้านใน', '680', '12', '12000', '10'];
 
-    processMaterials(testMaterial)
-        .then(result => console.log(result, "this is result"))
-        .catch(console.error);
-}
+//     processMaterials(testMaterial)
+//         .then(result => console.log(result, "this is result"))
+//         .catch(console.error);
+// }
 
 module.exports = processMaterials;
