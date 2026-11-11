@@ -4,6 +4,8 @@ require('dotenv').config({ path: 'url.env' });
 const express = require('express');
 const app = express();
 
+const processMaterials = require('./playwright');
+
 app.use(express.json());
 
 async function sendLine(message, target, quoteToken = null) {
@@ -31,12 +33,6 @@ async function sendLine(message, target, quoteToken = null) {
 }
 
 // Filter -CH materials and remember matching customers
-
-
-async function processMaterials(material) {
-    return 'ไว้ใส่วันที่ หลังอัพเดท'; // Playwright processing later
-}
-
 async function filterCH(text) {
     const customers = [];
     const filteredSections = [];
@@ -57,8 +53,17 @@ async function filterCH(text) {
 
         for (const row of matched) {
             const material = row.trim().split(/\s+/);
-            const replacement = await processMaterials(material);
 
+            if (material.length === 8) {
+                material.splice(2, 2, `${material[2]} ${material[3]}`);
+            }
+
+            if (material.length > 8) {
+                processedRows.push(row);
+                continue;
+            }
+
+            const replacement = await processMaterials(material);
             processedRows.push(`${row}\n${replacement}`);
         }
 
