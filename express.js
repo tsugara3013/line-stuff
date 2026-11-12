@@ -61,8 +61,8 @@ async function filterCH(text) {
 
             if (
                 (material.length === 9) &&
-                isNaN(Number(material[2])) &&
-                Number(material[3]) &&
+                (isNaN(Number(material[2])) ||
+                isNaN(Number(material[3]))) &&
                 Number(material.at(-1))
             ) {
                 material.splice(2, 2, `${material[2]} ${material[3]}`);
@@ -74,6 +74,14 @@ async function filterCH(text) {
                 Number(material[3]) &&
                 Number(material.at(-1))
             ) {
+                processedRows.push(row);
+                continue;
+            } else if (
+                isNaN(Number(material.at(-1)))
+            ) { 
+                process.push(row);
+            } else {
+                material.splice(2, 2, `${material[2]} ${material[3]}`);
                 processedRows.push(row);
                 continue;
             }
