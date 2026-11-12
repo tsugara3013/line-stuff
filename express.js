@@ -38,60 +38,54 @@ async function filterCH(text) {
     const filteredSections = [];
 
     for (const section of text.split(/\r?\n\s*\r?\n/)) {
-        const [header, ...rows] = section.trim().split(/\r?\n/);
+            const [header, ...rows] = section.trim().split(/\r?\n/);
 
-        const matched = rows.filter(row =>
-            /^\s*\S+-ch\b/i.test(row)
-        );
+            const matched = rows.filter(row =>
+                /\S+-ch\b/i.test(row)
+            );
 
-        if (!matched.length) continue;
+            if (!matched.length) continue;
 
-        const name = header.split(/ส่ง/)[0].trim();
-        customers.push(name);
+            const name = header.split(/ส่ง/)[0].trim();
+            customers.push(name);
 
-        const processedRows = [];
+            const processedRows = [];
 
-        for (const row of matched) {
-            const material = row.trim().split(/\s+/);
+            for (const row of matched) {
+                const material = row.trim().split(/\s+/);
+                const lastFour = material.slice(-4);
 
-            if (material.length > 10) {
-                processedRows.push(row);
-                continue;
+                if (
+                    material.length < 7 ||
+                    !lastFour.every(x => Number.isFinite(Number(x)))
+                ) {
+                    processedRows.push(row);
+                    continue;
+                }
+
+                // Join from the front until the first element contains -CH
+                while (
+                    material.length > 7 &&
+                    !material[0].toLowerCase().includes('-ch')
+                ) {
+                    material.splice(0, 2, `${material[0]} ${material[1]}`);
+                }
+
+                if (!material[0].toLowerCase().includes('-ch')) {
+                    processedRows.push(row);
+                    continue;
+                }
+
+                const normalized = [
+                    material[0],
+                    material[1],
+                    material.slice(2, -4).join(' '),
+                    ...material.slice(-4)
+                ];
+
+                const replacement = await processMaterials(normalized);
+                processedRows.push(`${row}\n${replacement}`);
             }
-
-            if (
-                (material.length === 9) &&
-                (isNaN(Number(material[2])) ||
-                isNaN(Number(material[3]))) &&
-                Number(material.at(-1))
-            ) {
-                material.splice(2, 2, `${material[2]} ${material[3]}`);
-            } 
-
-            if (
-                material.length === 8 &&
-                isNaN(Number(material[2])) &&
-                Number(material[3]) &&
-                !Number(material.at(-1))
-            ) {
-                processedRows.push(row);
-                continue;
-            } else if (
-                material.length === 8 &&
-                isNaN(Number(material[2])) &&
-                !Number(material[3]) &&
-                Number(material.at(-1)) 
-            ) {
-                 material.splice(2, 2, `${material[2]} ${material[3]}`);
-            } 
-               
-            
-
-            
-
-            const replacement = await processMaterials(material);
-            processedRows.push(`${row}\n${replacement}`);
-        }
 
         filteredSections.push(
             [header, ...processedRows].join('\n')
