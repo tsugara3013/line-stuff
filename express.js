@@ -70,7 +70,7 @@ async function filterCH(text) {
                 material.length === 8 &&
                 isNaN(Number(material[2])) &&
                 Number(material[3]) &&
-                !Number(material.at(-1))
+                Number(material.at(-1))
             ) {
                 processedRows.push(row);
                 continue;
